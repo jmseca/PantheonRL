@@ -26,6 +26,12 @@ from pantheonrl.envs.liargym.liar import LiarEnv, LiarDefaultAgent
 
 from overcookedgym.overcooked_utils import LAYOUT_LIST
 
+from wandb.integration.sb3 import WandbCallback
+import wandb
+
+ENABLE_WANDB = False
+ENABLE_SAVE = False
+
 ENV_LIST = ['RPS-v0', 'BlockEnv-v0', 'BlockEnv-v1', 'LiarsDice-v0',
             'OvercookedMultiEnv-v0']
 
@@ -391,6 +397,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--preset', type=int, help='Use preset args')
 
+    parser.add_argument('--run-id', type=str, help='Wandb Model Name')
+
     args = parser.parse_args()
 
     if args.preset:
@@ -399,6 +407,16 @@ if __name__ == '__main__':
 
     if args.share_latent:
         latent_check(args)
+
+    if ENABLE_WANDB:
+        wandb.tensorboard.patch(root_logdir=f"logs",pytorch=True)
+        # WANDB Stuff
+        run = wandb.init(
+            id=args.run_id,
+            project="Overcooked",
+            monitor_gym=False,  # auto-upload the videos of agents playing the game
+            save_code=False,  # optional
+        )
 
     print(f"Arguments: {args}")
     env, altenv = generate_env(args)
@@ -410,23 +428,40 @@ if __name__ == '__main__':
     learn_config = {'total_timesteps': args.total_timesteps}
     if args.tensorboard_log:
         learn_config['tb_log_name'] = args.tensorboard_name
-    ego.learn(**learn_config)
+
+    if ENABLE_WANDB:
+        ego.learn(
+            **learn_config,
+            callback = WandbCallback(
+                gradient_save_freq=500,
+                model_save_path=f"models/{run.id}",
+            )
+        )
+    else:
+        ego.learn(**learn_config)
 
     if args.record:
         transition = env.get_transitions()
         transition.write_transition(args.record)
 
-    if args.ego_save:
-        ego.save(args.ego_save)
-    if args.alt_save:
-        if len(partners) == 1:
-            try:
-                partners[0].model.save(args.alt_save)
-            except AttributeError:
-                print("FIXED or DEFAULT partners are not saved")
-        else:
-            for i in range(len(partners)):
+
+    if ENABLE_SAVE:
+        if args.ego_save:
+            args.ego_save=f'models/{run.id}/Ego'
+            ego.save(args.ego_save)
+        if args.alt_save:
+            if len(partners) == 1:
+                args.alt_save = f'models/{run.id}/Alt'
                 try:
-                    partners[i].model.save(f"{args.alt_save}/{i}")
+                    partners[0].model.save(args.alt_save)
                 except AttributeError:
                     print("FIXED or DEFAULT partners are not saved")
+            else:
+                for i in range(len(partners)):
+                    try:
+                        partners[i].model.save(f"{args.alt_save}/{i}")
+                    except AttributeError:
+                        print("FIXED or DEFAULT partners are not saved")
+
+    if ENABLE_WANDB:
+        run.finish()
