@@ -8,7 +8,7 @@ from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_P
 from pantheonrl.common.multiagentenv import SimultaneousEnv
 
 class OvercookedMultiEnv(SimultaneousEnv):
-    def __init__(self, layout_name, ego_agent_idx=0, baselines=False):
+    def __init__(self, layout_name, ego_agent_idx=0, baselines=False, shape_rew_disc=0.0, sparse_rew_disc=0.0):
         """
         base_env: OvercookedEnv
         featurize_fn: what function is used to featurize states returned in the 'both_agent_obs' field
@@ -25,6 +25,8 @@ class OvercookedMultiEnv(SimultaneousEnv):
             "DISH_DISP_DISTANCE_REW": 0,
             "POT_DISTANCE_REW": 0,
             "SOUP_DISTANCE_REW": 0,
+            "SPARSE_REW_DISCOUNT": sparse_rew_disc,
+            "SHAPED_REW_DISCOUNT": shape_rew_disc,
         }
 
         self.mdp = OvercookedGridworld.from_layout_name(layout_name=layout_name, rew_shaping_params=rew_shaping_params)
